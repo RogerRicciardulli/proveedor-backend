@@ -1,0 +1,47 @@
+[
+    {
+        "name": "1",
+        "size": "1",
+        "color": "1",
+        "photo": "1",
+        "stock": 1,
+        "id": 1,
+        "code": "3738436016"
+    },
+    {
+        "name": "Gaseosa",
+        "size": "2L",
+        "color": "Rojo",
+        "photo": "pepsi.jpg",
+        "stock": 500,
+        "id": 2,
+        "code": "2224790570"
+    },
+    {
+        "name": "2",
+        "size": "2",
+        "color": "3",
+        "photo": null,
+        "stock": 1,
+        "id": 3,
+        "code": "4733307976"
+    },
+    {
+        "name": "Galletas",
+        "size": "asfasfsa",
+        "color": "aaa",
+        "photo": "",
+        "stock": 30,
+        "id": 4,
+        "code": "6139849408"
+    },
+    {
+        "name": "Leche",
+        "size": "2L",
+        "color": "Verde",
+        "photo": "serenisima.jpg",
+        "stock": 15,
+        "id": 5,
+        "code": "3500597344"
+    }
+]
