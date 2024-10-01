@@ -18,11 +18,11 @@
         "code": "2224790570"
     },
     {
-        "name": "2",
-        "size": "2",
+        "name": "Remera Lisa",
+        "size": "Desconocido",
         "color": "3",
         "photo": null,
-        "stock": 1,
+        "stock": 3,
         "id": 3,
         "code": "4733307976"
     },
@@ -31,7 +31,7 @@
         "size": "asfasfsa",
         "color": "aaa",
         "photo": "",
-        "stock": 30,
+        "stock": 29,
         "id": 4,
         "code": "6139849408"
     },
@@ -40,8 +40,17 @@
         "size": "2L",
         "color": "Verde",
         "photo": "serenisima.jpg",
-        "stock": 15,
+        "stock": 14,
         "id": 5,
         "code": "3500597344"
+    },
+    {
+        "name": "Campera",
+        "size": "S",
+        "color": "Negro",
+        "photo": null,
+        "stock": 10,
+        "id": 6,
+        "code": "9854319202"
     }
 ]
