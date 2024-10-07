@@ -7,10 +7,13 @@ import logging
 from kafka import KafkaConsumer, KafkaProducer
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from confluent_kafka import Producer, Consumer, KafkaError
+from threading import Thread
 
 # Flask setup
 app = Flask(__name__)
 data_file = 'products.json'
+<<<<<<< Updated upstream
 CORS(app)
 
 # Logging setup
@@ -36,19 +39,68 @@ producer = KafkaProducer(
     bootstrap_servers='localhost:9092',
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
+=======
+orders_file = 'orders.json'
+CORS(app)
+>>>>>>> Stashed changes
 
-# Helper function to load data from JSON file
-def load_data():
-    if os.path.exists(data_file):
-        with open(data_file, 'r') as f:
+# Configuración de Kafka
+KAFKA_BROKER = 'localhost:9092'  # Ajusta esto a la dirección de tu broker de Kafka
+KAFKA_TOPIC = '/novedades'
+
+# Configuración del productor
+producer_config = {
+    'bootstrap.servers': KAFKA_BROKER,
+}
+producer = Producer(producer_config)
+
+# Configuración del consumidor
+consumer_config = {
+    'bootstrap.servers': KAFKA_BROKER,
+    'group.id': 'casa-central-group',
+    'auto.offset.reset': 'earliest'
+}
+consumer = Consumer(consumer_config)
+consumer.subscribe([KAFKA_TOPIC])
+
+# Almacén en memoria para las novedades
+novedades = []
+
+# Función para consumir mensajes de Kafka en segundo plano
+def consume_kafka_messages():
+    while True:
+        msg = consumer.poll(1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            if msg.error().code() == KafkaError._PARTITION_EOF:
+                continue
+            else:
+                print(f"Error de consumo: {msg.error()}")
+                break
+        
+        value = json.loads(msg.value().decode('utf-8'))
+        novedades.append(value)
+        # Limitar la lista a las últimas 100 novedades, por ejemplo
+        if len(novedades) > 100:
+            novedades.pop(0)
+
+# Iniciar el consumo de mensajes en un hilo separado
+kafka_thread = Thread(target=consume_kafka_messages)
+kafka_thread.daemon = True
+kafka_thread.start()
+
+def load_data(file):
+    if os.path.exists(file):
+        with open(file, 'r') as f:
             return json.load(f)
     return []
 
-# Helper function to save data to JSON file
-def save_data(data):
-    with open(data_file, 'w') as f:
+def save_data(data, file):
+    with open(file, 'w') as f:
         json.dump(data, f, indent=4)
 
+<<<<<<< Updated upstream
 def update_product_stock(code, new_stock):
     products = load_data()
 
@@ -75,47 +127,115 @@ def generate_code():
     return str(random.randint(1000000000, 9999999999))
 
 # Flask Routes
+=======
+def generate_code():
+    return str(random.randint(1000000000, 9999999999))
+
+def send_to_novedades_topic(product_info):
+    try:
+        producer.produce(KAFKA_TOPIC, json.dumps(product_info).encode('utf-8'))
+        producer.flush()
+        print(f"Mensaje enviado al topic {KAFKA_TOPIC}")
+    except Exception as e:
+        print(f"Error al enviar mensaje a Kafka: {str(e)}")
+>>>>>>> Stashed changes
 
 @app.route('/products', methods=['POST'])
 def create_product():
-    products = load_data()
+    products = load_data(data_file)
     new_product = request.json
     new_product['id'] = (products[-1]['id'] + 1) if products else 1
     new_product['code'] = generate_code()
-
-    # Add new product to the list and save
+    
+    required_fields = ['name', 'sizes', 'photos', 'stock']
+    if not all(field in new_product for field in required_fields):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    if not isinstance(new_product['sizes'], dict):
+        return jsonify({'error': 'Sizes should be a dictionary'}), 400
+    
+    for size, colors in new_product['sizes'].items():
+        if not isinstance(colors, list):
+            return jsonify({'error': f'Colors for size {size} should be a list'}), 400
+    
+    if not isinstance(new_product['photos'], list):
+        return jsonify({'error': 'Photos should be a list of URLs'}), 400
+    
+    if not isinstance(new_product['stock'], int) or new_product['stock'] < 0:
+        return jsonify({'error': 'Stock should be a non-negative integer'}), 400
+    
     products.append(new_product)
-    save_data(products)
-
+    save_data(products, data_file)
+    
+    novedades_info = {
+        'code': new_product['code'],
+        'sizes': new_product['sizes'],
+        'photos': new_product['photos'],
+        'stock': new_product['stock']
+    }
+    
+    send_to_novedades_topic(novedades_info)
+    
     return jsonify(new_product), 201
 
-# Get all products
-@app.route('/products', methods=['GET'])
-def get_products():
-    products = load_data()
-    return jsonify(products)
+@app.route('/novedades', methods=['GET'])
+def get_novedades():
+    return jsonify(novedades)
 
-# Get a product by ID
-@app.route('/products/<int:id>', methods=['GET'])
-def get_product(id):
-    products = load_data()
-    product = next((p for p in products if p['id'] == id), None)
-    if product:
-        return jsonify(product)
-    return jsonify({'error': 'Product not found'}), 404
+@app.route('/login', methods=['POST'])
+def login():
+    if not request.is_json:
+        return jsonify({'message': 'Missing JSON in request'}), 400
+    
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'message': 'Invalid JSON'}), 400
+    
+    username = data.get('username')
+    password = data.get('password')
+    
+    if not username or not password:
+        return jsonify({'message': 'Missing username or password'}), 400
+    
+    if username == 'casa_central' and password == 'password':
+        return jsonify({'message': 'Login successful', 'role': 'casa_central'}), 200
+    else:
+        return jsonify({'message': 'Invalid credentials'}), 401
 
-# Update a product by ID
-@app.route('/products/<int:id>', methods=['PUT'])
-def update_product(id):
-    products = load_data()
-    product = next((p for p in products if p['id'] == id), None)
-    if product:
-        # Update product fields with request data
-        updated_data = request.json
-        product.update(updated_data)
-        save_data(products)
-        return jsonify(product)
-    return jsonify({'error': 'Product not found'}), 404
+def inicializador_de_ordenes():
+    if not os.path.exists(orders_file):
+        sample_orders = [
+            {
+                "id": 1,
+                "status": "paused",
+                "items": [
+                    {"product_id": 1, "quantity": 2},
+                    {"product_id": 2, "quantity": 1}
+                ]
+            },
+            {
+                "id": 2,
+                "status": "processing",
+                "items": [
+                    {"product_id": 3, "quantity": 1},
+                    {"product_id": 4, "quantity": 3}
+                ]
+            },
+            {
+                "id": 3,
+                "status": "paused",
+                "items": [
+                    {"product_id": 2, "quantity": 5},
+                    {"product_id": 5, "quantity": 2}
+                ]
+            }
+        ]
+        save_data(sample_orders, orders_file)
+        print("Initialized orders.json with sample data")
+    else:
+        print("orders.json already exists")
+
 
 # Start processing messages from the consumer
 def start_kafka_consumer():
