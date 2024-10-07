@@ -13,7 +13,7 @@ from threading import Thread
 # Flask setup
 app = Flask(__name__)
 data_file = 'products.json'
-<<<<<<< Updated upstream
+orders_file = 'orders.json'
 CORS(app)
 
 # Logging setup
@@ -39,10 +39,6 @@ producer = KafkaProducer(
     bootstrap_servers='localhost:9092',
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
-=======
-orders_file = 'orders.json'
-CORS(app)
->>>>>>> Stashed changes
 
 # Configuración de Kafka
 KAFKA_BROKER = 'localhost:9092'  # Ajusta esto a la dirección de tu broker de Kafka
@@ -100,7 +96,6 @@ def save_data(data, file):
     with open(file, 'w') as f:
         json.dump(data, f, indent=4)
 
-<<<<<<< Updated upstream
 def update_product_stock(code, new_stock):
     products = load_data()
 
@@ -126,10 +121,6 @@ def get_product_by_code(code):
 def generate_code():
     return str(random.randint(1000000000, 9999999999))
 
-# Flask Routes
-=======
-def generate_code():
-    return str(random.randint(1000000000, 9999999999))
 
 def send_to_novedades_topic(product_info):
     try:
@@ -138,7 +129,6 @@ def send_to_novedades_topic(product_info):
         print(f"Mensaje enviado al topic {KAFKA_TOPIC}")
     except Exception as e:
         print(f"Error al enviar mensaje a Kafka: {str(e)}")
->>>>>>> Stashed changes
 
 @app.route('/products', methods=['POST'])
 def create_product():
