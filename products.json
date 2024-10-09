@@ -52,5 +52,54 @@
         "stock": 10,
         "id": 6,
         "code": "9854319202"
+    },
+    {
+        "name": "TEST001",
+        "sizes": {
+            "S": [
+                "Rojo",
+                "Azul",
+                "Amarillo"
+            ],
+            "M": [
+                "Verde"
+            ]
+        },
+        "photos": [
+            "http://example.com/camiseta.jpg"
+        ],
+        "stock": 45,
+        "id": 7,
+        "code": "6665855341"
+    },
+    {
+        "name": "Producto de prueba 1",
+        "sizes": {
+            "M": [
+                "Rojo",
+                "Azul"
+            ]
+        },
+        "photos": [
+            "http://example.com/producto1.jpg"
+        ],
+        "stock": 10,
+        "id": 8,
+        "code": "6059718670"
+    },
+    {
+        "name": "Producto de prueba 2",
+        "sizes": {
+            "L": [
+                "Verde",
+                "Negro"
+            ]
+        },
+        "photos": [
+            "http://example.com/producto2.jpg"
+        ],
+        "stock": 5,
+        "id": 9,
+        "code": "4743108175"
     }
 ]

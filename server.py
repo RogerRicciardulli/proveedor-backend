@@ -7,6 +7,7 @@ import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from confluent_kafka import Producer, Consumer, KafkaError
+from threading import Thread
 
 app = Flask(__name__)
 data_file = 'products.json'
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 
 # Configuración de Kafka
 KAFKA_BROKER = 'localhost:9092'
-KAFKA_TOPIC_NOVEDADES = '/novedades'
+KAFKA_TOPIC_NOVEDADES = 'novedades'
 KAFKA_TOPIC_ORDEN_COMPRA = 'orden-de-compra'
 
 # Configuración del productor
@@ -37,6 +38,35 @@ consumer.subscribe([KAFKA_TOPIC_ORDEN_COMPRA])
 
 # Almacén en memoria para las novedades
 novedades = []
+
+def consume_kafka_messages():
+    while True:
+        msg = consumer.poll(1.0)
+        if msg is None:
+            continue
+        if msg.error():
+            if msg.error().code() == KafkaError._PARTITION_EOF:
+                continue
+            else:
+                print(f"Error de consumo: {msg.error()}")
+                break
+        
+        value = json.loads(msg.value().decode('utf-8'))
+        novedades.append(value)
+        # Limitar la lista a las últimas 100 novedades, por ejemplo
+        if len(novedades) > 100:
+            novedades.pop(0)
+
+kafka_thread = Thread(target=consume_kafka_messages)
+kafka_thread.start()
+
+def send_to_novedades_topic(product_info):
+    try:
+        producer.produce(KAFKA_TOPIC_NOVEDADES, json.dumps(product_info).encode('utf-8'))
+        producer.flush()
+        print(f"Mensaje enviado al topic {KAFKA_TOPIC_NOVEDADES}")
+    except Exception as e:
+        print(f"Error al enviar mensaje a Kafka: {str(e)}")
 
 def inicializador_de_ordenes():
     if not os.path.exists(orders_file):
@@ -140,8 +170,7 @@ def create_product():
     novedades_info = {
         'code': new_product['code'],
         'sizes': new_product['sizes'],
-        'photos': new_product['photos'],
-        'stock': new_product['stock']
+        'photos': new_product['photos']
     }
     
     send_to_kafka(KAFKA_TOPIC_NOVEDADES, novedades_info)
@@ -151,6 +180,69 @@ def create_product():
 @app.route('/novedades', methods=['GET'])
 def get_novedades():
     return jsonify(novedades)
+
+@app.route('/orders', methods=['POST'])
+def create_order():
+    orders = load_data(orders_file)
+    products = load_data(data_file)
+    new_order = request.json
+    new_order['id'] = (orders[-1]['id'] + 1) if orders else 1
+    
+    can_fulfill = True
+    for item in new_order['items']:
+        product = next((p for p in products if p['id'] == item['product_id']), None)
+        if not product or product['stock'] < item['quantity']:
+            can_fulfill = False
+            break
+    
+    if can_fulfill:
+        new_order['status'] = 'processing'
+        for item in new_order['items']:
+            product = next((p for p in products if p['id'] == item['product_id']), None)
+            product['stock'] -= item['quantity']
+    else:
+        new_order['status'] = 'paused'
+    
+    orders.append(new_order)
+    save_data(orders, orders_file)
+    save_data(products, data_file)
+    return jsonify(new_order), 201
+
+@app.route('/products/<int:id>/stock', methods=['PUT'])
+def update_stock(id):
+    products = load_data(data_file)
+    product = next((p for p in products if p['id'] == id), None)
+    if product:
+        new_stock = request.json.get('stock')
+        if new_stock is not None:
+            product['stock'] = new_stock
+            save_data(products, data_file)
+            reprocess_paused_orders()
+            return jsonify(product)
+        return jsonify({'error': 'Stock value not provided'}), 400
+    return jsonify({'error': 'Product not found'}), 404
+
+def reprocess_paused_orders():
+    orders = load_data(orders_file)
+    products = load_data(data_file)
+    
+    for order in orders:
+        if order['status'] == 'paused':
+            can_fulfill = True
+            for item in order['items']:
+                product = next((p for p in products if p['id'] == item['product_id']), None)
+                if not product or product['stock'] < item['quantity']:
+                    can_fulfill = False
+                    break
+            
+            if can_fulfill:
+                for item in order['items']:
+                    product = next((p for p in products if p['id'] == item['product_id']), None)
+                    product['stock'] -= item['quantity']
+                order['status'] = 'processing'
+    
+    save_data(orders, orders_file)
+    save_data(products, data_file)
 
 @app.route('/login', methods=['POST'])
 def login():
