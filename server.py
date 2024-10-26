@@ -4,14 +4,21 @@ import os
 import random
 import threading
 import logging
+import csv
+import io
+import pymysql
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from confluent_kafka import Producer, Consumer, KafkaError
 from threading import Thread
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
+
 
 app = Flask(__name__)
-data_file = 'products.json'
-orders_file = 'orders.json'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+data_file = os.path.join(BASE_DIR, 'products.json')
+orders_file = os.path.join(BASE_DIR, 'orders.json')
 CORS(app)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -68,48 +75,31 @@ def send_to_novedades_topic(product_info):
     except Exception as e:
         print(f"Error al enviar mensaje a Kafka: {str(e)}")
 
-def inicializador_de_ordenes():
-    if not os.path.exists(orders_file):
-        sample_orders = [
-            {
-                "id": 1,
-                "status": "pausado",
-                "items": [
-                    {"product_id": 1, "quantity": 2},
-                    {"product_id": 2, "quantity": 1}
-                ]
-            },
-            {
-                "id": 2,
-                "status": "procesando",
-                "items": [
-                    {"product_id": 3, "quantity": 1},
-                    {"product_id": 4, "quantity": 3}
-                ]
-            },
-            {
-                "id": 3,
-                "status": "pausado",
-                "items": [
-                    {"product_id": 2, "quantity": 5},
-                    {"product_id": 5, "quantity": 2}
-                ]
-            }
-        ]
-        save_data(sample_orders, orders_file)
-        print("orders.json se inicializó con información de ejemplo correctamente")
-    else:
-        print("orders.json ya existe")
-
 def load_data(file):
-    if os.path.exists(file):
-        with open(file, 'r') as f:
-            return json.load(f)
-    return []
+    """Cargar datos desde un archivo JSON"""
+    try:
+        if os.path.exists(file) and os.path.getsize(file) > 0:
+            with open(file, 'r') as f:
+                return json.load(f)
+        else:
+            logging.info(f"Archivo {file} no existe o está vacío. Retornando lista vacía.")
+            return []
+    except json.JSONDecodeError as e:
+        logging.error(f"Error al decodificar JSON desde {file}: {str(e)}")
+        return []
+    except Exception as e:
+        logging.error(f"Error al cargar datos desde {file}: {str(e)}")
+        return []
 
 def save_data(data, file):
-    with open(file, 'w') as f:
-        json.dump(data, f, indent=4)
+    """Guardar datos en un archivo JSON"""
+    try:
+        os.makedirs(os.path.dirname(file), exist_ok=True)  # Crear directorio si no existe
+        with open(file, 'w') as f:
+            json.dump(data, f, indent=4)
+        logging.info(f"Datos guardados exitosamente en {file}")
+    except Exception as e:
+        logging.error(f"Error al guardar datos en {file}: {str(e)}")
 
 def update_product_stock(code, new_stock):
     products = load_data(data_file)
@@ -183,30 +173,48 @@ def get_novedades():
 
 @app.route('/orders', methods=['POST'])
 def create_order():
-    orders = load_data(orders_file)
-    products = load_data(data_file)
-    new_order = request.json
-    new_order['id'] = (orders[-1]['id'] + 1) if orders else 1
-    
-    can_fulfill = True
-    for item in new_order['items']:
-        product = next((p for p in products if p['id'] == item['product_id']), None)
-        if not product or product['stock'] < item['quantity']:
-            can_fulfill = False
-            break
-    
-    if can_fulfill:
-        new_order['status'] = 'processing'
+    try:
+        orders = load_data(orders_file)
+        products = load_data(data_file)
+        
+        if not isinstance(orders, list):
+            orders = []
+            
+        new_order = request.json
+        if not new_order:
+            return jsonify({'error': 'No se proporcionaron datos de la orden'}), 400
+            
+        new_order['id'] = (orders[-1]['id'] + 1) if orders else 1
+        
+        if 'items' not in new_order:
+            return jsonify({'error': 'La orden debe contener items'}), 400
+        
+        can_fulfill = True
         for item in new_order['items']:
+            if not isinstance(item, dict) or 'product_id' not in item or 'quantity' not in item:
+                return jsonify({'error': 'Formato de item inválido'}), 400
+                
             product = next((p for p in products if p['id'] == item['product_id']), None)
-            product['stock'] -= item['quantity']
-    else:
-        new_order['status'] = 'paused'
-    
-    orders.append(new_order)
-    save_data(orders, orders_file)
-    save_data(products, data_file)
-    return jsonify(new_order), 201
+            if not product or product['stock'] < item['quantity']:
+                can_fulfill = False
+                break
+        
+        if can_fulfill:
+            new_order['status'] = 'processing'
+            for item in new_order['items']:
+                product = next((p for p in products if p['id'] == item['product_id']), None)
+                product['stock'] -= item['quantity']
+        else:
+            new_order['status'] = 'paused'
+        
+        orders.append(new_order)
+        save_data(orders, orders_file)
+        save_data(products, data_file)
+        return jsonify(new_order), 201
+        
+    except Exception as e:
+        logging.error(f"Error al crear orden: {str(e)}")
+        return jsonify({'error': 'Error interno al procesar la orden'}), 500
 
 @app.route('/products/<int:id>/stock', methods=['PUT'])
 def update_stock(id):
@@ -352,9 +360,197 @@ def start_kafka_consumer():
                 }
                 send_to_kafka(topic_solicitudes, response)
 
+class ValidationError:
+    def __init__(self, line_number, error_message):
+        self.line_number = line_number
+        self.error_message = error_message
+
+    def to_dict(self):
+        return {
+            'linea': self.line_number,
+            'error': self.error_message
+        }
+
+def validar_linea_info(linea):
+    return all(field.strip() for field in linea)
+
+def check_username_exists(connection, username):
+    """Verificar si el usuario ya existe"""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) as count FROM users WHERE username = %s", (username,))
+        result = cursor.fetchone()
+        return result['count'] > 0
+
+def check_tienda_status(connection, store_code):
+    """Verificar si la tienda existe y está activa"""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT id, enabled FROM stores WHERE code = %s", (store_code,))
+        store = cursor.fetchone()
+        
+        if not store:
+            return None, f"Tienda con código {store_code} no existe"
+        if not store['enabled']:
+            return None, f"Tienda con código {store_code} está deshabilitada"
+            
+        return store['id'], None
+
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': 'root',
+    'database': 'stockearte',
+    'charset': 'utf8mb4',
+    'cursorclass': pymysql.cursors.DictCursor
+}
+
+def get_db_connection():
+    """Crear conexión a la base de datos usando pymysql"""
+    try:
+        return pymysql.connect(**DB_CONFIG)
+    except Exception as e:
+        logging.error(f"Error al crear conexión a la base de datos: {e}")
+        raise
+
+@app.route('/users/bulk-upload', methods=['POST'])
+def bulk_upload_users():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No se proporcionó archivo'}), 400
+    
+    file = request.files['file']
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'El archivo debe ser CSV'}), 400
+    
+    try:
+        # Leer el archivo CSV
+        csv_content = file.read().decode('utf-8')
+        csv_file = io.StringIO(csv_content)
+        csv_reader = csv.reader(csv_file, delimiter=';')
+        
+        validation_errors = []
+        created_users = []
+        line_number = 0
+        
+        connection = get_db_connection()
+        
+        try:
+            for row in csv_reader:
+                line_number += 1
+                
+                # Validar número de campos
+                if len(row) != 5:
+                    validation_errors.append(
+                        ValidationError(line_number, "Número incorrecto de campos")
+                    )
+                    continue
+                
+                username, password, first_name, last_name, store_code = row
+                
+                # Validar campos vacíos
+                if not validar_linea_info(row):
+                    validation_errors.append(
+                        ValidationError(line_number, "Campos vacíos no permitidos")
+                    )
+                    continue
+                
+                # Verificar duplicidad de usuario
+                if check_username_exists(connection, username):
+                    validation_errors.append(
+                        ValidationError(line_number, f"Usuario {username} ya existe")
+                    )
+                    continue
+                
+                # Verificar tienda
+                store_id, store_error = check_tienda_status(connection, store_code)
+                if store_error:
+                    validation_errors.append(
+                        ValidationError(line_number, store_error)
+                    )
+                    continue
+                
+                try:
+                    # Insertar nuevo usuario
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            INSERT INTO users (username, password, first_name, last_name, enabled, store_id)
+                            VALUES (%s, %s, %s, %s, 1, %s)
+                        """, (username, password, first_name, last_name, store_id))
+                    
+                    connection.commit()
+                    
+                    created_users.append({
+                        'username': username,
+                        'first_name': first_name,
+                        'last_name': last_name,
+                        'store_code': store_code
+                    })
+                    
+                except Exception as e:
+                    connection.rollback()
+                    validation_errors.append(
+                        ValidationError(line_number, f"Error al insertar usuario: {str(e)}")
+                    )
+                    continue
+                    
+        finally:
+            connection.close()
+        
+        # Preparar respuesta
+        response = {
+            'usuarios_creados': len(created_users),
+            'usuarios': created_users,
+            'errores': [error.to_dict() for error in validation_errors]
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        logging.error(f"Error al procesar archivo CSV: {str(e)}")
+        return jsonify({'error': f'Error al procesar archivo: {str(e)}'}), 500
+
 # Iniciar el consumo de mensajes en un hilo separado
 kafka_thread = threading.Thread(target=start_kafka_consumer, daemon=True)
 kafka_thread.start()
+
+def inicializador_de_ordenes():
+    """Inicializar el archivo orders.json con datos de ejemplo"""
+    try:
+        if not os.path.exists(orders_file):
+            sample_orders = [
+                {
+                    "id": 1,
+                    "status": "pausado",
+                    "items": [
+                        {"product_id": 1, "quantity": 2},
+                        {"product_id": 2, "quantity": 1}
+                    ]
+                },
+                {
+                    "id": 2,
+                    "status": "procesando",
+                    "items": [
+                        {"product_id": 3, "quantity": 1},
+                        {"product_id": 4, "quantity": 3}
+                    ]
+                },
+                {
+                    "id": 3,
+                    "status": "pausado",
+                    "items": [
+                        {"product_id": 2, "quantity": 5},
+                        {"product_id": 5, "quantity": 2}
+                    ]
+                }
+            ]
+            save_data(sample_orders, orders_file)
+            logging.info("orders.json se inicializó con información de ejemplo correctamente")
+        else:
+            if os.path.getsize(orders_file) == 0:
+                logging.warning("orders.json existe pero está vacío. Inicializando con datos de ejemplo.")
+                save_data([], orders_file)
+            else:
+                logging.info("orders.json ya existe y contiene datos")
+    except Exception as e:
+        logging.error(f"Error al inicializar orders.json: {str(e)}")
 
 if __name__ == '__main__':
     inicializador_de_ordenes()
