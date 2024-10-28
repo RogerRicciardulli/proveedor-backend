@@ -38,7 +38,7 @@ producer = Producer(producer_config)
 # Configuración del consumidor
 consumer_config = {
     'bootstrap.servers': KAFKA_BROKER,
-    'group.id': 'backend-consumer-group',
+    'group.id': 'mi-grupo',
     'auto.offset.reset': 'earliest',
     'enable.auto.commit': False,
     'fetch.max.bytes': 1048576,
@@ -48,7 +48,6 @@ consumer_config = {
 consumer = Consumer(consumer_config)
 consumer.subscribe([KAFKA_TOPIC_ORDEN_COMPRA])
 
-# Almacén en memoria para las novedades
 novedades = []
 
 
@@ -64,15 +63,23 @@ def consume_kafka_messages():
                 print(f"Error de consumo: {msg.error()}")
                 break
 
-        value = json.loads(msg.value().decode('utf-8'))
-        novedades.append(value)
-        # Limitar la lista a las últimas 100 novedades, por ejemplo
-        if len(novedades) > 100:
-            novedades.pop(0)
+        try:
+            value = json.loads(msg.value().decode('utf-8'))
+            novedades.append(value)
+            consumer.commit(msg)
+            print(f"Mensaje confirmado y agregado a novedades: {value}")
+
+            if len(novedades) > 100:
+                novedades.pop(0)
+        except json.JSONDecodeError:
+            logging.warning("Error al decodificar JSON. Saltando mensaje...")
+        except Exception as e:
+            logging.error(f"Error procesando el mensaje: {str(e)}")
 
 
-kafka_thread = Thread(target=consume_kafka_messages)
-kafka_thread.start()
+# kafka_thread = Thread(target=consume_kafka_messages)
+# kafka_thread = Thread(target=start_kafka_consumer)
+# kafka_thread.start()
 
 
 def send_to_novedades_topic(product_info):
@@ -315,6 +322,7 @@ def start_kafka_consumer():
                 break
 
         try:
+            consumer.commit(msg)
             orden_compra = json.loads(msg.value().decode('utf-8'))
         except json.JSONDecodeError:
             logging.warning("Received an invalid message. Skipping...")
@@ -366,7 +374,9 @@ def start_kafka_consumer():
                         'fecha_estimacion_envio': fecha_estimacion_envio
                     }
                     print(response)
+                    print('DESPACHO', response)
                     send_to_kafka(topic_despacho, despacho)
+                    # Metodo para escuchar en recepcion
                     update_product_stock(product['code'], product['stock'])
                 else:
                     if product['stock'] < cantidad:
@@ -390,6 +400,10 @@ def start_kafka_consumer():
                     'fecha_solicitud': fecha_solicitud
                 }
                 send_to_kafka(topic_solicitudes, response)
+
+
+kafka_thread = Thread(target=start_kafka_consumer)
+kafka_thread.start()
 
 
 class ValidationError:
@@ -604,4 +618,5 @@ def inicializador_de_ordenes():
 
 if __name__ == '__main__':
     inicializador_de_ordenes()
-    app.run(debug=True, port=5000)
+
+    app.run(debug=True, port=5001)
