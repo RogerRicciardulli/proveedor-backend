@@ -1,296 +1,58 @@
 [
     {
         "id": 1,
-        "status": "pausado",
-        "items": [
-            {
-                "product_id": 1,
-                "quantity": 2
-            },
-            {
-                "product_id": 2,
-                "quantity": 1
-            }
-        ]
+        "items": {
+            "codigo": "3738436016",
+            "color": "ROJO",
+            "talle": "L",
+            "cantidad": 1
+        },
+        "estado": "ACEPTADA",
+        "observaciones": "Producto: 3738436016. Orden aceptada.",
+        "orden_despacho": 7934,
+        "fecha_solicitud": "2024-10-29T16:58:58.257476",
+        "fecha_recepcion": null
     },
     {
         "id": 2,
-        "status": "procesando",
-        "items": [
-            {
-                "product_id": 3,
-                "quantity": 1
-            },
-            {
-                "product_id": 4,
-                "quantity": 3
-            }
-        ]
+        "items": {
+            "codigo": "373843601",
+            "color": "ROJO",
+            "talle": "L",
+            "cantidad": 1
+        },
+        "estado": "RECHAZADA",
+        "observaciones": "Producto: 373843601 no existe.",
+        "orden_despacho": null,
+        "fecha_solicitud": "2024-10-30T09:57:33.364722",
+        "fecha_recepcion": null
     },
     {
         "id": 3,
-        "status": "pausado",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 5
-            },
-            {
-                "product_id": 5,
-                "quantity": 2
-            }
-        ]
+        "items": {
+            "codigo": "3738436016",
+            "color": "ROJO",
+            "talle": "L",
+            "cantidad": 1000000000
+        },
+        "estado": "ACEPTADA",
+        "observaciones": "Producto: 3738436016 no tiene suficiente stock. Solicitud queda pendiente.",
+        "orden_despacho": null,
+        "fecha_solicitud": "2024-10-30T09:58:22.445079",
+        "fecha_recepcion": null
     },
     {
-        "items": [
-            {
-                "product_id": 33,
-                "quantity": 2
-            },
-            {
-                "product_id": 34,
-                "quantity": 1
-            }
-        ],
         "id": 4,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 33,
-                "quantity": 1000
-            },
-            {
-                "product_id": 34,
-                "quantity": 1
-            }
-        ],
-        "id": 5,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 37,
-                "quantity": 2
-            },
-            {
-                "product_id": 38,
-                "quantity": 1
-            }
-        ],
-        "id": 6,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 37,
-                "quantity": 1000
-            },
-            {
-                "product_id": 38,
-                "quantity": 1
-            }
-        ],
-        "id": 7,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 40,
-                "quantity": 2
-            },
-            {
-                "product_id": 41,
-                "quantity": 1
-            }
-        ],
-        "id": 8,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 40,
-                "quantity": 1000
-            },
-            {
-                "product_id": 41,
-                "quantity": 1
-            }
-        ],
-        "id": 9,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 43,
-                "quantity": 2
-            },
-            {
-                "product_id": 44,
-                "quantity": 1
-            }
-        ],
-        "id": 10,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 43,
-                "quantity": 1000
-            },
-            {
-                "product_id": 44,
-                "quantity": 1
-            }
-        ],
-        "id": 11,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 46,
-                "quantity": 2
-            },
-            {
-                "product_id": 47,
-                "quantity": 1
-            }
-        ],
-        "id": 12,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 46,
-                "quantity": 1000
-            },
-            {
-                "product_id": 47,
-                "quantity": 1
-            }
-        ],
-        "id": 13,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 49,
-                "quantity": 2
-            },
-            {
-                "product_id": 50,
-                "quantity": 1
-            }
-        ],
-        "id": 14,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 49,
-                "quantity": 1000
-            },
-            {
-                "product_id": 50,
-                "quantity": 1
-            }
-        ],
-        "id": 15,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 11,
-                "quantity": 2
-            },
-            {
-                "product_id": 12,
-                "quantity": 1
-            }
-        ],
-        "id": 16,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 11,
-                "quantity": 1000
-            },
-            {
-                "product_id": 12,
-                "quantity": 1
-            }
-        ],
-        "id": 17,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 14,
-                "quantity": 2
-            },
-            {
-                "product_id": 15,
-                "quantity": 1
-            }
-        ],
-        "id": 18,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 14,
-                "quantity": 1000
-            },
-            {
-                "product_id": 15,
-                "quantity": 1
-            }
-        ],
-        "id": 19,
-        "status": "paused"
-    },
-    {
-        "items": [
-            {
-                "product_id": 17,
-                "quantity": 2
-            },
-            {
-                "product_id": 18,
-                "quantity": 1
-            }
-        ],
-        "id": 20,
-        "status": "processing"
-    },
-    {
-        "items": [
-            {
-                "product_id": 17,
-                "quantity": 1000
-            },
-            {
-                "product_id": 18,
-                "quantity": 1
-            }
-        ],
-        "id": 21,
-        "status": "paused"
+        "items": {
+            "codigo": "3738436016",
+            "color": "ROJO",
+            "talle": "L",
+            "cantidad": 1
+        },
+        "estado": "ACEPTADA",
+        "observaciones": "Producto: 3738436016. Orden aceptada.",
+        "orden_despacho": 4450,
+        "fecha_solicitud": "2024-10-30T10:06:19.666270",
+        "fecha_recepcion": null
     }
 ]
